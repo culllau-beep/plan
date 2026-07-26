@@ -1,4 +1,6 @@
-// 데일리 플래너 데이터 타입 및 localStorage 저장/조회 유틸
+// 데일리 플래너 데이터 타입 및 Supabase 저장/조회 유틸 (로그인 없이 anon key로 접근)
+
+import { supabase } from "@/lib/supabase";
 
 export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
@@ -31,6 +33,17 @@ export interface DailyPlan {
   updatedAt: string;
 }
 
+interface DailyPlanRow {
+  week_id: string;
+  day: DayKey;
+  date: string;
+  hourly: Record<string, string>;
+  goal: string;
+  todos: string[];
+  note: string;
+  updated_at: string;
+}
+
 export function createEmptyPlan(): DailyPlan {
   return {
     date: "",
@@ -42,51 +55,68 @@ export function createEmptyPlan(): DailyPlan {
   };
 }
 
-function storageKey(weekId: string, day: DayKey) {
-  return `daily-planner:week-${weekId}:${day}`;
+function rowToPlan(row: Pick<DailyPlanRow, "date" | "hourly" | "goal" | "todos" | "note" | "updated_at">): DailyPlan {
+  return {
+    date: row.date ?? "",
+    hourly: { ...createEmptyPlan().hourly, ...row.hourly },
+    goal: row.goal ?? "",
+    todos: row.todos?.length ? row.todos : createEmptyPlan().todos,
+    note: row.note ?? "",
+    updatedAt: row.updated_at ?? "",
+  };
 }
 
-export function loadPlan(weekId: string, day: DayKey): DailyPlan {
-  if (typeof window === "undefined") return createEmptyPlan();
+export async function fetchPlan(weekId: string, day: DayKey): Promise<DailyPlan> {
+  const { data, error } = await supabase
+    .from("daily_plans")
+    .select("date, hourly, goal, todos, note, updated_at")
+    .eq("week_id", weekId)
+    .eq("day", day)
+    .maybeSingle();
 
-  const raw = window.localStorage.getItem(storageKey(weekId, day));
-  if (!raw) return createEmptyPlan();
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<DailyPlan>;
-    return {
-      ...createEmptyPlan(),
-      ...parsed,
-      hourly: { ...createEmptyPlan().hourly, ...parsed.hourly },
-    };
-  } catch {
-    return createEmptyPlan();
-  }
+  if (error) throw error;
+  if (!data) return createEmptyPlan();
+  return rowToPlan(data);
 }
 
-export function savePlan(weekId: string, day: DayKey, plan: DailyPlan) {
-  if (typeof window === "undefined") return;
+export async function savePlan(
+  weekId: string,
+  day: DayKey,
+  plan: DailyPlan
+): Promise<void> {
+  const { error } = await supabase.from("daily_plans").upsert({
+    week_id: weekId,
+    day,
+    date: plan.date,
+    hourly: plan.hourly,
+    goal: plan.goal,
+    todos: plan.todos,
+    note: plan.note,
+    updated_at: new Date().toISOString(),
+  });
 
-  const next: DailyPlan = { ...plan, updatedAt: new Date().toISOString() };
-  window.localStorage.setItem(storageKey(weekId, day), JSON.stringify(next));
+  if (error) throw error;
 }
 
-export function hasPlan(weekId: string, day: DayKey): boolean {
-  if (typeof window === "undefined") return false;
+export async function fetchWeekStatus(
+  weekId: string
+): Promise<Partial<Record<DayKey, boolean>>> {
+  const { data, error } = await supabase
+    .from("daily_plans")
+    .select("day, date, hourly, goal, todos, note")
+    .eq("week_id", weekId);
 
-  const raw = window.localStorage.getItem(storageKey(weekId, day));
-  if (!raw) return false;
+  if (error) throw error;
 
-  try {
-    const parsed = JSON.parse(raw) as Partial<DailyPlan>;
-    return Boolean(
-      parsed.date?.trim() ||
-        parsed.goal?.trim() ||
-        parsed.note?.trim() ||
-        parsed.todos?.some((t) => t.trim()) ||
-        Object.values(parsed.hourly ?? {}).some((v) => v.trim())
+  const status: Partial<Record<DayKey, boolean>> = {};
+  for (const row of data ?? []) {
+    status[row.day as DayKey] = Boolean(
+      row.date?.trim() ||
+        row.goal?.trim() ||
+        row.note?.trim() ||
+        row.todos?.some((t: string) => t.trim()) ||
+        Object.values(row.hourly ?? {}).some((v) => String(v).trim())
     );
-  } catch {
-    return false;
   }
+  return status;
 }

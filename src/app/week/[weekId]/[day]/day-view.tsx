@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  createEmptyPlan,
   DAYS,
+  fetchPlan,
   HOURS,
-  TODO_COUNT,
-  loadPlan,
   savePlan,
+  TODO_COUNT,
   type DailyPlan,
   type DayKey,
 } from "@/lib/planner";
@@ -18,18 +19,45 @@ export default function DayView() {
   const { weekId, day } = params;
   const dayInfo = DAYS.find((d) => d.key === day);
 
-  // ssr:false로만 렌더링되는 컴포넌트이므로, 최초 렌더 시점에
-  // localStorage를 그대로 읽어도 하이드레이션 불일치가 없다.
-  const [plan, setPlan] = useState<DailyPlan>(() =>
-    dayInfo ? loadPlan(weekId, dayInfo.key) : loadPlan(weekId, "mon")
+  const [plan, setPlan] = useState<DailyPlan | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle"
   );
-  const [savedMessage, setSavedMessage] = useState(false);
+
+  useEffect(() => {
+    if (!dayInfo) return;
+    let cancelled = false;
+
+    fetchPlan(weekId, dayInfo.key)
+      .then((loaded) => {
+        if (!cancelled) setPlan(loaded);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPlan(createEmptyPlan());
+          setLoadError(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [weekId, dayInfo]);
 
   if (!dayInfo) {
     notFound();
   }
 
   const activeDay = dayInfo as { key: DayKey; label: string };
+
+  if (!plan) {
+    return (
+      <main className="flex-1 px-6 py-16 text-center text-foreground/50">
+        불러오는 중...
+      </main>
+    );
+  }
 
   const updateHour = (hour: string, value: string) => {
     setPlan({ ...plan, hourly: { ...plan.hourly, [hour]: value } });
@@ -42,9 +70,13 @@ export default function DayView() {
   };
 
   const handleSave = () => {
-    savePlan(weekId, activeDay.key, plan);
-    setSavedMessage(true);
-    setTimeout(() => setSavedMessage(false), 2000);
+    setSaveState("saving");
+    savePlan(weekId, activeDay.key, plan)
+      .then(() => {
+        setSaveState("saved");
+        setTimeout(() => setSaveState("idle"), 2000);
+      })
+      .catch(() => setSaveState("error"));
   };
 
   return (
@@ -151,15 +183,24 @@ export default function DayView() {
           </div>
 
           <div className="mt-10 flex items-center justify-end gap-3">
-            {savedMessage && (
+            {loadError && (
+              <span className="text-sm text-red-500">
+                불러오기에 실패해 빈 화면으로 시작합니다
+              </span>
+            )}
+            {saveState === "saved" && (
               <span className="text-sm text-accent">저장되었습니다</span>
+            )}
+            {saveState === "error" && (
+              <span className="text-sm text-red-500">저장에 실패했습니다</span>
             )}
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-90"
+              disabled={saveState === "saving"}
+              className="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
             >
-              저장하기
+              {saveState === "saving" ? "저장 중..." : "저장하기"}
             </button>
           </div>
         </div>

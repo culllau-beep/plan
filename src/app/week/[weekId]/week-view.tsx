@@ -2,16 +2,8 @@
 
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
-import { useState } from "react";
-import { DAYS, WEEK_COUNT, hasPlan, type DayKey } from "@/lib/planner";
-
-function computeStatus(weekId: string): Partial<Record<DayKey, boolean>> {
-  const status: Partial<Record<DayKey, boolean>> = {};
-  DAYS.forEach(({ key }) => {
-    status[key] = hasPlan(weekId, key);
-  });
-  return status;
-}
+import { useEffect, useState } from "react";
+import { DAYS, WEEK_COUNT, fetchWeekStatus, type DayKey } from "@/lib/planner";
 
 export default function WeekView() {
   const params = useParams<{ weekId: string }>();
@@ -20,11 +12,26 @@ export default function WeekView() {
   const isValidWeek =
     Number.isInteger(weekNumber) && weekNumber >= 1 && weekNumber <= WEEK_COUNT;
 
-  // ssr:false로만 렌더링되는 컴포넌트이므로, 최초 렌더 시점에
-  // localStorage를 그대로 읽어도 하이드레이션 불일치가 없다.
-  const [completed] = useState(() =>
-    isValidWeek ? computeStatus(weekId) : {}
+  const [completed, setCompleted] = useState<Partial<Record<DayKey, boolean>>>(
+    {}
   );
+
+  useEffect(() => {
+    if (!isValidWeek) return;
+    let cancelled = false;
+
+    fetchWeekStatus(weekId)
+      .then((status) => {
+        if (!cancelled) setCompleted(status);
+      })
+      .catch(() => {
+        /* 조회 실패 시 전부 "작성 전"으로 보여준다 */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [weekId, isValidWeek]);
 
   if (!isValidWeek) {
     notFound();

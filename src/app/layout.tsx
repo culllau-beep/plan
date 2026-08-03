@@ -20,7 +20,7 @@ const dancingScript = Dancing_Script({
 
 export const metadata: Metadata = {
   title: "Daily Planner",
-  description: "10주 동안의 일정을 계획하는 데일리 플래너",
+  description: "12주 동안의 일정을 계획하는 데일리 플래너",
 };
 
 export default function RootLayout({

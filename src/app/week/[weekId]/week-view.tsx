@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { DAYS, WEEK_COUNT, fetchWeekStatus, type DayKey } from "@/lib/planner";
+import {
+  DAYS,
+  WEEK_COUNT,
+  fetchWeekStatus,
+  type DayKey,
+  type DayStatus,
+} from "@/lib/planner";
 
 export default function WeekView() {
   const params = useParams<{ weekId: string }>();
@@ -12,7 +18,7 @@ export default function WeekView() {
   const isValidWeek =
     Number.isInteger(weekNumber) && weekNumber >= 1 && weekNumber <= WEEK_COUNT;
 
-  const [completed, setCompleted] = useState<Partial<Record<DayKey, boolean>>>(
+  const [status, setStatus] = useState<Partial<Record<DayKey, DayStatus>>>(
     {}
   );
 
@@ -21,8 +27,8 @@ export default function WeekView() {
     let cancelled = false;
 
     fetchWeekStatus(weekId)
-      .then((status) => {
-        if (!cancelled) setCompleted(status);
+      .then((result) => {
+        if (!cancelled) setStatus(result);
       })
       .catch(() => {
         /* 조회 실패 시 전부 "작성 전"으로 보여준다 */
@@ -60,12 +66,18 @@ export default function WeekView() {
               </span>
               <span
                 className={
-                  completed[key]
-                    ? "text-xs font-medium text-accent"
-                    : "text-xs text-foreground/40"
+                  status[key] === "done"
+                    ? "text-xs font-semibold text-accent"
+                    : status[key] === "written"
+                      ? "text-xs font-medium text-accent/70"
+                      : "text-xs text-foreground/40"
                 }
               >
-                {completed[key] ? "작성됨" : "작성 전"}
+                {status[key] === "done"
+                  ? "완료됨"
+                  : status[key] === "written"
+                    ? "작성됨"
+                    : "작성 전"}
               </span>
             </Link>
           ))}

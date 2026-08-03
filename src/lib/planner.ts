@@ -14,7 +14,7 @@ export const DAYS: { key: DayKey; label: string }[] = [
   { key: "sun", label: "일요일" },
 ];
 
-export const WEEK_COUNT = 10;
+export const WEEK_COUNT = 12;
 
 // 06:00 ~ 24:00, 1시간 단위
 export const HOURS = Array.from({ length: 19 }, (_, i) => {
@@ -24,14 +24,21 @@ export const HOURS = Array.from({ length: 19 }, (_, i) => {
 
 export const TODO_COUNT = 8;
 
+export interface TodoItem {
+  text: string;
+  done: boolean;
+}
+
 export interface DailyPlan {
   date: string;
   hourly: Record<string, string>;
   goal: string;
-  todos: string[];
+  todos: TodoItem[];
   note: string;
   updatedAt: string;
 }
+
+export type DayStatus = "empty" | "written" | "done";
 
 interface DailyPlanRow {
   week_id: string;
@@ -39,7 +46,7 @@ interface DailyPlanRow {
   date: string;
   hourly: Record<string, string>;
   goal: string;
-  todos: string[];
+  todos: (TodoItem | string)[];
   note: string;
   updated_at: string;
 }
@@ -49,10 +56,18 @@ export function createEmptyPlan(): DailyPlan {
     date: "",
     hourly: Object.fromEntries(HOURS.map((h) => [h, ""])),
     goal: "",
-    todos: Array.from({ length: TODO_COUNT }, () => ""),
+    todos: Array.from({ length: TODO_COUNT }, () => ({ text: "", done: false })),
     note: "",
     updatedAt: "",
   };
+}
+
+// 예전 데이터(string[])와 새 데이터({text, done}[]) 형식을 모두 지원한다.
+function normalizeTodos(todos: (TodoItem | string)[] | undefined): TodoItem[] {
+  if (!todos?.length) return createEmptyPlan().todos;
+  return todos.map((t) =>
+    typeof t === "string" ? { text: t, done: false } : { text: t.text ?? "", done: Boolean(t.done) }
+  );
 }
 
 function rowToPlan(row: Pick<DailyPlanRow, "date" | "hourly" | "goal" | "todos" | "note" | "updated_at">): DailyPlan {
@@ -60,7 +75,7 @@ function rowToPlan(row: Pick<DailyPlanRow, "date" | "hourly" | "goal" | "todos" 
     date: row.date ?? "",
     hourly: { ...createEmptyPlan().hourly, ...row.hourly },
     goal: row.goal ?? "",
-    todos: row.todos?.length ? row.todos : createEmptyPlan().todos,
+    todos: normalizeTodos(row.todos),
     note: row.note ?? "",
     updatedAt: row.updated_at ?? "",
   };
@@ -100,7 +115,7 @@ export async function savePlan(
 
 export async function fetchWeekStatus(
   weekId: string
-): Promise<Partial<Record<DayKey, boolean>>> {
+): Promise<Partial<Record<DayKey, DayStatus>>> {
   const { data, error } = await supabase
     .from("daily_plans")
     .select("day, date, hourly, goal, todos, note")
@@ -108,15 +123,21 @@ export async function fetchWeekStatus(
 
   if (error) throw error;
 
-  const status: Partial<Record<DayKey, boolean>> = {};
+  const status: Partial<Record<DayKey, DayStatus>> = {};
   for (const row of data ?? []) {
-    status[row.day as DayKey] = Boolean(
+    const todos = normalizeTodos(row.todos);
+    const filledTodos = todos.filter((t) => t.text.trim());
+
+    const written = Boolean(
       row.date?.trim() ||
         row.goal?.trim() ||
         row.note?.trim() ||
-        row.todos?.some((t: string) => t.trim()) ||
+        filledTodos.length > 0 ||
         Object.values(row.hourly ?? {}).some((v) => String(v).trim())
     );
+    const done = filledTodos.length > 0 && filledTodos.every((t) => t.done);
+
+    status[row.day as DayKey] = done ? "done" : written ? "written" : "empty";
   }
   return status;
 }

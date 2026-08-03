@@ -65,7 +65,13 @@ export default function DayView() {
 
   const updateTodo = (index: number, value: string) => {
     const todos = [...plan.todos];
-    todos[index] = value;
+    todos[index] = { ...todos[index], text: value };
+    setPlan({ ...plan, todos });
+  };
+
+  const toggleTodo = (index: number) => {
+    const todos = [...plan.todos];
+    todos[index] = { ...todos[index], done: !todos[index].done };
     setPlan({ ...plan, todos });
   };
 
@@ -151,19 +157,32 @@ export default function DayView() {
                   To Do List
                 </h2>
                 <div className="mt-3 flex flex-col gap-2">
-                  {Array.from({ length: TODO_COUNT }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="border-b border-dotted border-line py-1"
-                    >
-                      <input
-                        type="text"
-                        value={plan.todos[index] ?? ""}
-                        onChange={(e) => updateTodo(index, e.target.value)}
-                        className="w-full bg-transparent text-sm text-foreground outline-none"
-                      />
-                    </div>
-                  ))}
+                  {Array.from({ length: TODO_COUNT }).map((_, index) => {
+                    const todo = plan.todos[index] ?? { text: "", done: false };
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 border-b border-dotted border-line py-1"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={todo.done}
+                          onChange={() => toggleTodo(index)}
+                          className="h-4 w-4 shrink-0 accent-accent"
+                        />
+                        <input
+                          type="text"
+                          value={todo.text}
+                          onChange={(e) => updateTodo(index, e.target.value)}
+                          className={`w-full bg-transparent text-sm outline-none ${
+                            todo.done
+                              ? "text-foreground/40 line-through"
+                              : "text-foreground"
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

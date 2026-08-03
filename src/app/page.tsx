@@ -8,7 +8,7 @@ export default function Home() {
     <main className="flex-1 px-6 py-16 sm:px-10">
       <div className="mx-auto max-w-3xl">
         <p className="text-sm uppercase tracking-[0.3em] text-accent">
-          10 Weeks
+          12 Weeks
         </p>
         <h1 className="mt-2 font-script text-6xl text-accent sm:text-7xl">
           Daily Planner

@@ -6,7 +6,10 @@ import { useEffect, useState } from "react";
 import {
   DAYS,
   WEEK_COUNT,
+  fetchStartDate,
   fetchWeekStatus,
+  getDateForDay,
+  resetWeek,
   type DayKey,
   type DayStatus,
 } from "@/lib/planner";
@@ -21,6 +24,8 @@ export default function WeekView() {
   const [status, setStatus] = useState<Partial<Record<DayKey, DayStatus>>>(
     {}
   );
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     if (!isValidWeek) return;
@@ -34,6 +39,14 @@ export default function WeekView() {
         /* 조회 실패 시 전부 "작성 전"으로 보여준다 */
       });
 
+    fetchStartDate()
+      .then((result) => {
+        if (!cancelled) setStartDate(result);
+      })
+      .catch(() => {
+        /* 조회 실패 시 날짜 없이 보여준다 */
+      });
+
     return () => {
       cancelled = true;
     };
@@ -43,19 +56,54 @@ export default function WeekView() {
     notFound();
   }
 
+  const handleResetWeek = async () => {
+    if (
+      !window.confirm(
+        `${weekId}주차에 작성한 내용을 모두 초기화할까요? 되돌릴 수 없습니다.`
+      )
+    ) {
+      return;
+    }
+    setResetting(true);
+    try {
+      await resetWeek(weekId);
+      setStatus({});
+    } catch {
+      alert("초기화에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <main className="flex-1 px-6 py-16 sm:px-10">
       <div className="mx-auto max-w-2xl">
         <Link href="/" className="text-sm text-accent hover:underline">
           ← 전체 주차
         </Link>
-        <p className="mt-4 text-sm uppercase tracking-[0.3em] text-accent">
-          Week {weekId}
-        </p>
-        <h1 className="mt-2 font-script text-6xl text-accent">{weekId}주차</h1>
+        <div className="mt-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.3em] text-accent">
+              Week {weekId}
+            </p>
+            <h1 className="mt-2 font-script text-6xl text-accent">
+              {weekId}주차
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={handleResetWeek}
+            disabled={resetting}
+            className="mt-1 shrink-0 rounded-full border border-line px-4 py-2 text-sm text-foreground/60 transition hover:border-red-300 hover:text-red-500 disabled:opacity-50"
+          >
+            {resetting ? "초기화 중..." : "이번 주 초기화"}
+          </button>
+        </div>
 
         <div className="mt-10 flex flex-col gap-3">
-          {DAYS.map(({ key, label }) => (
+          {DAYS.map(({ key, label }) => {
+            const date = startDate ? getDateForDay(startDate, weekNumber, key) : "";
+            return (
             <Link
               key={key}
               href={`/week/${weekId}/${key}`}
@@ -63,6 +111,11 @@ export default function WeekView() {
             >
               <span className="text-lg font-medium text-foreground">
                 {label}
+                {date && (
+                  <span className="ml-2 text-sm font-normal text-foreground/50">
+                    ({date})
+                  </span>
+                )}
               </span>
               <span
                 className={
@@ -80,7 +133,8 @@ export default function WeekView() {
                     : "작성 전"}
               </span>
             </Link>
-          ))}
+            );
+          })}
         </div>
       </div>
     </main>

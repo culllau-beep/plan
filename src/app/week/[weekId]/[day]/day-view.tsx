@@ -7,6 +7,8 @@ import {
   createEmptyPlan,
   DAYS,
   fetchPlan,
+  fetchStartDate,
+  getDateForDay,
   HOURS,
   savePlan,
   TODO_COUNT,
@@ -17,10 +19,12 @@ import {
 export default function DayView() {
   const params = useParams<{ weekId: string; day: string }>();
   const { weekId, day } = params;
+  const weekNumber = Number(weekId);
   const dayInfo = DAYS.find((d) => d.key === day);
 
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [startDate, setStartDate] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
     "idle"
   );
@@ -40,6 +44,14 @@ export default function DayView() {
         }
       });
 
+    fetchStartDate()
+      .then((result) => {
+        if (!cancelled) setStartDate(result);
+      })
+      .catch(() => {
+        /* 조회 실패 시 날짜 없이 보여준다 */
+      });
+
     return () => {
       cancelled = true;
     };
@@ -50,6 +62,7 @@ export default function DayView() {
   }
 
   const activeDay = dayInfo as { key: DayKey; label: string };
+  const computedDate = startDate ? getDateForDay(startDate, weekNumber, activeDay.key) : "";
 
   if (!plan) {
     return (
@@ -77,7 +90,7 @@ export default function DayView() {
 
   const handleSave = () => {
     setSaveState("saving");
-    savePlan(weekId, activeDay.key, plan)
+    savePlan(weekId, activeDay.key, { ...plan, date: computedDate })
       .then(() => {
         setSaveState("saved");
         setTimeout(() => setSaveState("idle"), 2000);
@@ -97,7 +110,35 @@ export default function DayView() {
           </Link>
           <span className="text-foreground/50">
             {weekId}주차 · {activeDay.label}
+            {computedDate && ` (${computedDate})`}
           </span>
+        </div>
+
+        <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
+          {DAYS.map(({ key, label }) => {
+            const date = startDate ? getDateForDay(startDate, weekNumber, key) : "";
+            const isActive = key === activeDay.key;
+            return (
+              <Link
+                key={key}
+                href={`/week/${weekId}/${key}`}
+                className={`shrink-0 rounded-full border px-4 py-2 text-sm transition ${
+                  isActive
+                    ? "border-accent bg-accent text-white"
+                    : "border-line bg-card text-foreground/70 hover:border-accent/50"
+                }`}
+              >
+                {label}
+                {date && (
+                  <span
+                    className={`ml-1 text-xs ${isActive ? "text-white/80" : "text-foreground/40"}`}
+                  >
+                    {date.slice(5)}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </div>
 
         <div className="rounded-3xl border border-line bg-card px-6 py-8 shadow-sm sm:px-10 sm:py-10">
@@ -105,15 +146,9 @@ export default function DayView() {
             <h1 className="font-script text-5xl text-accent sm:text-6xl">
               Daily Planner
             </h1>
-            <label className="flex items-center gap-2 rounded-full border border-line px-4 py-2 text-sm text-foreground/70">
-              날짜
-              <input
-                type="date"
-                value={plan.date}
-                onChange={(e) => setPlan({ ...plan, date: e.target.value })}
-                className="bg-transparent text-foreground outline-none"
-              />
-            </label>
+            <span className="rounded-full border border-line px-4 py-2 text-sm text-foreground/70">
+              {computedDate || "시작일 미설정"}
+            </span>
           </div>
 
           <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_1.1fr]">

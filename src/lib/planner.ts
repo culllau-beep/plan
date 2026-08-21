@@ -40,6 +40,50 @@ export interface DailyPlan {
 
 export type DayStatus = "empty" | "written" | "done";
 
+// 플래너 시작일(1주차 월요일)을 기준으로 모든 주차/요일의 날짜가 자동으로 계산된다.
+const SETTINGS_ID = 1;
+
+function formatDateLocal(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function getDateForDay(startDate: string, week: number, day: DayKey): string {
+  const dayIndex = DAYS.findIndex((d) => d.key === day);
+  const [y, m, d] = startDate.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + (week - 1) * 7 + dayIndex);
+  return formatDateLocal(date);
+}
+
+export async function fetchStartDate(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("planner_settings")
+    .select("start_date")
+    .eq("id", SETTINGS_ID)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.start_date || null;
+}
+
+export async function saveStartDate(startDate: string): Promise<void> {
+  const { error } = await supabase.from("planner_settings").upsert({
+    id: SETTINGS_ID,
+    start_date: startDate,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) throw error;
+}
+
+export async function resetWeek(weekId: string): Promise<void> {
+  const { error } = await supabase.from("daily_plans").delete().eq("week_id", weekId);
+  if (error) throw error;
+}
+
 interface DailyPlanRow {
   week_id: string;
   day: DayKey;
@@ -129,8 +173,7 @@ export async function fetchWeekStatus(
     const filledTodos = todos.filter((t) => t.text.trim());
 
     const written = Boolean(
-      row.date?.trim() ||
-        row.goal?.trim() ||
+      row.goal?.trim() ||
         row.note?.trim() ||
         filledTodos.length > 0 ||
         Object.values(row.hourly ?? {}).some((v) => String(v).trim())

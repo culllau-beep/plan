@@ -119,7 +119,7 @@ export default function HomeView() {
           {weeks.map((week) => (
             <Link
               key={week}
-              href={`/week/${week}`}
+              href={`/week/${week}/mon`}
               className="rounded-2xl border border-line bg-card px-5 py-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
               <span className="block text-xs text-accent/70">WEEK</span>

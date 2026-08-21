@@ -1,5 +1,5 @@
 import { WEEK_COUNT } from "@/lib/planner";
-import WeekViewLoader from "./week-view-loader";
+import WeekRedirect from "./week-redirect";
 
 export function generateStaticParams() {
   return Array.from({ length: WEEK_COUNT }, (_, i) => ({
@@ -8,5 +8,5 @@ export function generateStaticParams() {
 }
 
 export default function Page() {
-  return <WeekViewLoader />;
+  return <WeekRedirect />;
 }

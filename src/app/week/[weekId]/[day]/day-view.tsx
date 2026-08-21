@@ -8,12 +8,15 @@ import {
   DAYS,
   fetchPlan,
   fetchStartDate,
+  fetchWeekStatus,
   getDateForDay,
   HOURS,
+  resetWeek,
   savePlan,
   TODO_COUNT,
   type DailyPlan,
   type DayKey,
+  type DayStatus,
 } from "@/lib/planner";
 
 export default function DayView() {
@@ -25,6 +28,8 @@ export default function DayView() {
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [startDate, setStartDate] = useState<string | null>(null);
+  const [status, setStatus] = useState<Partial<Record<DayKey, DayStatus>>>({});
+  const [resetting, setResetting] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
     "idle"
   );
@@ -50,6 +55,14 @@ export default function DayView() {
       })
       .catch(() => {
         /* 조회 실패 시 날짜 없이 보여준다 */
+      });
+
+    fetchWeekStatus(weekId)
+      .then((result) => {
+        if (!cancelled) setStatus(result);
+      })
+      .catch(() => {
+        /* 조회 실패 시 전부 "작성 전"으로 보여준다 */
       });
 
     return () => {
@@ -94,48 +107,94 @@ export default function DayView() {
       .then(() => {
         setSaveState("saved");
         setTimeout(() => setSaveState("idle"), 2000);
+        fetchWeekStatus(weekId).then(setStatus).catch(() => {});
       })
       .catch(() => setSaveState("error"));
+  };
+
+  const handleResetWeek = async () => {
+    if (
+      !window.confirm(
+        `${weekId}주차에 작성한 내용을 모두 초기화할까요? 되돌릴 수 없습니다.`
+      )
+    ) {
+      return;
+    }
+    setResetting(true);
+    try {
+      await resetWeek(weekId);
+      setStatus({});
+      setPlan(createEmptyPlan());
+    } catch {
+      alert("초기화에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setResetting(false);
+    }
   };
 
   return (
     <main className="flex-1 px-4 py-10 sm:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between text-sm">
-          <Link
-            href={`/week/${weekId}`}
-            className="text-accent hover:underline"
-          >
-            ← {weekId}주차로
+          <Link href="/" className="text-accent hover:underline">
+            ← 전체 주차
           </Link>
-          <span className="text-foreground/50">
-            {weekId}주차 · {activeDay.label}
-            {computedDate && ` (${computedDate})`}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-foreground/50">
+              {weekId}주차 · {activeDay.label}
+              {computedDate && ` (${computedDate})`}
+            </span>
+            <button
+              type="button"
+              onClick={handleResetWeek}
+              disabled={resetting}
+              className="rounded-full border border-line px-3 py-1.5 text-xs text-foreground/60 transition hover:border-red-300 hover:text-red-500 disabled:opacity-50"
+            >
+              {resetting ? "초기화 중..." : "이번 주 초기화"}
+            </button>
+          </div>
         </div>
 
         <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
           {DAYS.map(({ key, label }) => {
             const date = startDate ? getDateForDay(startDate, weekNumber, key) : "";
             const isActive = key === activeDay.key;
+            const dayStatus = status[key];
+            const statusLabel =
+              dayStatus === "done" ? "완료됨" : dayStatus === "written" ? "작성됨" : "작성 전";
             return (
               <Link
                 key={key}
                 href={`/week/${weekId}/${key}`}
-                className={`shrink-0 rounded-full border px-4 py-2 text-sm transition ${
+                className={`flex shrink-0 flex-col items-center gap-0.5 rounded-2xl border px-4 py-2 text-sm transition ${
                   isActive
                     ? "border-accent bg-accent text-white"
                     : "border-line bg-card text-foreground/70 hover:border-accent/50"
                 }`}
               >
-                {label}
-                {date && (
-                  <span
-                    className={`ml-1 text-xs ${isActive ? "text-white/80" : "text-foreground/40"}`}
-                  >
-                    {date.slice(5)}
-                  </span>
-                )}
+                <span>
+                  {label}
+                  {date && (
+                    <span
+                      className={`ml-1 text-xs ${isActive ? "text-white/80" : "text-foreground/40"}`}
+                    >
+                      {date.slice(5)}
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={`text-[11px] ${
+                    isActive
+                      ? "text-white/80"
+                      : dayStatus === "done"
+                        ? "font-semibold text-accent"
+                        : dayStatus === "written"
+                          ? "text-accent/70"
+                          : "text-foreground/40"
+                  }`}
+                >
+                  {statusLabel}
+                </span>
               </Link>
             );
           })}

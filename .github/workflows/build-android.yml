@@ -47,10 +47,8 @@ jobs:
           code=$?
           if [ "$code" -ne 0 ]; then
             # 실패 원인을 어노테이션으로 요약해 로그를 열지 않고도 확인할 수 있게 한다.
-            msg=$(grep -E -A12 "What went wrong" "$RUNNER_TEMP/gradle.log" | head -25 | sed ':a;N;$!ba;s/
-/%0A/g')
-            [ -z "$msg" ] && msg=$(tail -25 "$RUNNER_TEMP/gradle.log" | sed ':a;N;$!ba;s/
-/%0A/g')
+            msg=$(grep -E -A12 "What went wrong" "$RUNNER_TEMP/gradle.log" | head -25 | awk '{printf "%s%%0A", $0}')
+            [ -z "$msg" ] && msg=$(tail -25 "$RUNNER_TEMP/gradle.log" | awk '{printf "%s%%0A", $0}')
             echo "::error title=Gradle 빌드 실패::$msg"
             tail -60 "$RUNNER_TEMP/gradle.log"
           fi

@@ -8,7 +8,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI에서는 실행 번호로 versionCode를 올려 매 업로드마다 고유 값을 보장한다.
-        versionCode (System.getenv("VERSION_CODE") ?: "1").toInteger()
+        versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

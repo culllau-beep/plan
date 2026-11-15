@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-// Supabase(브라우저 전용 호출)를 사용하므로 서버 렌더링을 건너뛴다.
+// localStorage(브라우저 전용)를 사용하므로 서버 렌더링을 건너뛴다.
 const HomeView = dynamic(() => import("./home-view"), {
   ssr: false,
   loading: () => (

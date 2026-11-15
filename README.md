@@ -2,7 +2,7 @@
 
 12주 동안 주차 -> 요일 순으로 하루 일정을 계획하는 데일리 플래너 웹앱입니다.
 
-Next.js(App Router) + TypeScript + Tailwind CSS로 만들었고, 작성한 내용은 Supabase에 저장됩니다.
+Next.js(App Router) + TypeScript + Tailwind CSS로 만들었고, 작성한 내용은 로그인 없이 사용자 기기(localStorage)에만 저장되며, 홈 화면에서 JSON 백업/복원을 할 수 있습니다.
 
 ## Getting Started
 

@@ -1,8 +1,17 @@
 "use client";
 
+import { Capacitor } from "@capacitor/core";
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { fetchStartDate, saveStartDate, WEEK_COUNT } from "@/lib/planner";
+import { useEffect, useRef, useState } from "react";
+import {
+  exportBackup,
+  fetchStartDate,
+  importBackup,
+  saveStartDate,
+  WEEK_COUNT,
+} from "@/lib/planner";
 
 export default function HomeView() {
   const weeks = Array.from({ length: WEEK_COUNT }, (_, i) => i + 1);
@@ -12,6 +21,7 @@ export default function HomeView() {
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +55,46 @@ export default function HomeView() {
       alert("시작일 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // 백업: 앱에서는 공유 시트(드라이브·카톡 등)로, 웹에서는 파일 다운로드로 내보낸다.
+  const handleExport = async () => {
+    const fileName = `daily-planner-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const json = exportBackup();
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { uri } = await Filesystem.writeFile({
+          path: fileName,
+          data: json,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+        });
+        await Share.share({ title: "플래너 백업", url: uri });
+      } catch {
+        /* 사용자가 공유를 취소한 경우 등은 무시한다 */
+      }
+      return;
+    }
+
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // 복원: 백업 파일을 읽어 현재 데이터를 덮어쓴다.
+  const handleImport = async (file: File) => {
+    if (!window.confirm("현재 데이터를 백업 파일의 내용으로 덮어씁니다. 계속할까요?")) return;
+    try {
+      importBackup(await file.text());
+      window.location.reload();
+    } catch {
+      window.alert("복원에 실패했습니다. 올바른 백업 파일인지 확인해주세요.");
     }
   };
 
@@ -128,6 +178,31 @@ export default function HomeView() {
               </span>
             </Link>
           ))}
+        </div>
+
+        <div className="mt-12 flex flex-wrap items-center gap-3 border-t border-line pt-6 text-sm text-foreground/60">
+          <span>데이터는 이 기기에만 저장돼요.</span>
+          <button type="button" onClick={handleExport} className="text-accent hover:underline">
+            백업하기
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="text-accent hover:underline"
+          >
+            복원하기
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImport(file);
+              e.target.value = "";
+            }}
+          />
         </div>
       </div>
     </main>

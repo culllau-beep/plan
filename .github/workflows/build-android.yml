@@ -2,6 +2,10 @@ name: Build Android AAB
 
 on:
   workflow_dispatch:
+  # 임시: 빌드 문제 진단 중에만 워크플로 파일 푸시 시 자동 실행 (진단 후 제거)
+  push:
+    paths:
+      - ".github/workflows/build-android.yml"
 
 jobs:
   build:
@@ -36,7 +40,21 @@ jobs:
 
       - name: Build signed AAB
         working-directory: android
-        run: ./gradlew bundleRelease
+        shell: bash
+        run: |
+          set +e
+          ./gradlew bundleRelease --console=plain --stacktrace > "$RUNNER_TEMP/gradle.log" 2>&1
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            # 실패 원인을 어노테이션으로 요약해 로그를 열지 않고도 확인할 수 있게 한다.
+            msg=$(grep -E -A12 "What went wrong" "$RUNNER_TEMP/gradle.log" | head -25 | sed ':a;N;$!ba;s/
+/%0A/g')
+            [ -z "$msg" ] && msg=$(tail -25 "$RUNNER_TEMP/gradle.log" | sed ':a;N;$!ba;s/
+/%0A/g')
+            echo "::error title=Gradle 빌드 실패::$msg"
+            tail -60 "$RUNNER_TEMP/gradle.log"
+          fi
+          exit $code
         env:
           VERSION_CODE: ${{ github.run_number }}
           KEYSTORE_PATH: ${{ runner.temp }}/release.jks

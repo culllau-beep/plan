@@ -135,12 +135,12 @@ export default function DayView() {
   return (
     <main className="flex-1 px-4 py-10 sm:px-8">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center justify-between text-sm">
-          <Link href="/" className="text-accent hover:underline">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-sm">
+          <Link href="/" className="whitespace-nowrap text-accent hover:underline">
             ← 전체 주차
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="text-foreground/50">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="whitespace-nowrap text-foreground/50">
               {weekId}주차 · {activeDay.label}
               {computedDate && ` (${computedDate})`}
             </span>
@@ -148,7 +148,7 @@ export default function DayView() {
               type="button"
               onClick={handleResetWeek}
               disabled={resetting}
-              className="rounded-full border border-line px-3 py-1.5 text-xs text-foreground/60 transition hover:border-red-300 hover:text-red-500 disabled:opacity-50"
+              className="whitespace-nowrap rounded-full border border-line px-3 py-1.5 text-xs text-foreground/60 transition hover:border-red-300 hover:text-red-500 disabled:opacity-50"
             >
               {resetting ? "초기화 중..." : "이번 주 초기화"}
             </button>

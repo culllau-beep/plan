@@ -56,7 +56,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./gradlew bundleRelease --console=plain --stacktrace > "$RUNNER_TEMP/gradle.log" 2>&1
+          ./gradlew bundleRelease assembleRelease --console=plain --stacktrace > "$RUNNER_TEMP/gradle.log" 2>&1
           code=$?
           if [ "$code" -ne 0 ]; then
             # 실패 원인을 어노테이션으로 요약해 로그를 열지 않고도 확인할 수 있게 한다.
@@ -78,3 +78,10 @@ jobs:
         with:
           name: app-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
+
+      # 폰에 직접 설치해 테스트하기 위한 APK (Play Store 업로드에는 AAB를 사용)
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
